@@ -1,0 +1,29 @@
+name: run script
+
+on:
+  schedule:
+    - cron: "*/15 * * * *" # Runs every 10 minutes
+  workflow_dispatch:
+
+jobs:
+  run-script:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.9
+
+    - name: Install Dependencies
+      run: |
+        pip install requests PyGithub beautifulsoup4 cssutils
+
+    - name: Run comparer.py
+      env:
+        TOKEN: ${{ secrets.TOKEN }}
+      run: |
+        python comparer.py
