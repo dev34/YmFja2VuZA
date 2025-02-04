@@ -4,7 +4,6 @@ import cssutils
 import re
 import logging
 import json
-from collections import defaultdict
 
 cssutils.log.setLevel(logging.CRITICAL)
 
@@ -35,7 +34,7 @@ class ScheduleProcessor:
 
     def extract_time(self, name):
         """Extract time from the name if explicitly provided."""
-        match = re.search(r'\b(\d{1,2}:\d{0,2}-\d{1,2}:\d{0,2})\b', name)
+        match = re.search(r'\b(\d{1,2}:\d{0,2}[-:]\d{1,2}:\d{0,2})\b', name)
         return match.group(1) if match else None
 
     def split_key(self, key):
@@ -69,7 +68,8 @@ class ScheduleProcessor:
             if not section:
                 continue
             time_letter, location_number = self.split_key(key)
-            time = self.extract_time(name) or self.lab_times.get(time_letter, 'N/A')
+            time = self.extract_time(name) or (self.lab_times.get(time_letter, 'N/A') if '==half==' not in name else self.room_times.get(time_letter, 'N/A'))
+            name = name.replace('==half==', '').strip()
             location = self.lab_locations.get(location_number, 'N/A')
             self.final_schedule.setdefault(section, []).append({
                 'name': name.split('(')[0].strip(),
@@ -122,7 +122,7 @@ def extract_room_times(rows,isFrday=False):
                     room_times[coordinates] = cell_text
     return room_times
 
-def extract_lab_times(rows):
+def extract_lab_times(rows,isFrday=False):
     lab_times = {}
     for row in rows:
         cells = row.find_all("td")
@@ -142,10 +142,14 @@ def extract_lab_times(rows):
                     col_letter = col_number_to_letter(column_index)
                     coordinates = f"{col_letter}"
                     lab_times[coordinates] = cell_text
+    # if isFriday then adjust lab times, to ignore the prayer break by subtracting 3 col letter from the last time
+    if (isFrday == True):
+        last_key = list(lab_times.keys())[-1]
+        new_key = chr(ord(last_key) - 3)
+        lab_times[new_key] = lab_times.pop(last_key)
     return lab_times
 
 def programme_course_name_extractor(department,batch,sheet_style_tags, sheet_rows):
-
     style_tags = sheet_style_tags
     rows = sheet_rows
     #GPT OPTIMIZATION ##############################################################
@@ -156,12 +160,10 @@ def programme_course_name_extractor(department,batch,sheet_style_tags, sheet_row
                   for rule in css_content.cssRules if rule.type == rule.STYLE_RULE
                   for match in [re.search(r"\.s\d+", rule.selectorText)] if match}
     #################################################################################
-
     target_text = f"{department} ({batch})"
     target_color = None
     results = {}
     results_lab = {}
-
     ############ FINDING COLOR ###########
     colorIsIterate = True
     for row in rows:
@@ -189,6 +191,8 @@ def programme_course_name_extractor(department,batch,sheet_style_tags, sheet_row
                     appendToLabs = True
             for cell in cells:
                 cell_text = cell.get_text(strip=True)
+                if (cell_text == "P  R  A  Y  E  R     B  R  E  A  K"):
+                    continue
                 pattern = r'\b[A-Z]+-[A-Z]\d+\b'
                 matches = re.findall(pattern, cell_text)
                 if matches:
@@ -198,6 +202,10 @@ def programme_course_name_extractor(department,batch,sheet_style_tags, sheet_row
                 if "Cancelled" in cell_text or "cancelled" in cell_text:
                     cell_text = cell_text.split("(")
                     cell_text[0] = cell_text[0] + "[Cancelled]"
+                    cell_text = " (".join(cell_text)
+                if "ReSch" in cell_text or "Resch" in cell_text or "resch" in cell_text:
+                    cell_text = cell_text.split("(")
+                    cell_text[0] = cell_text[0] + "[Rescheduled]"
                     cell_text = " (".join(cell_text)
                 cell_width = cell.get("colspan")
                 if cell_width != None:
@@ -212,12 +220,14 @@ def programme_course_name_extractor(department,batch,sheet_style_tags, sheet_row
                         cell_color = css_styles[f".{cls}"]
                         break
                 ##########################
-                
                 if cell_color == target_color and cell_text != target_text and cell_text!="":
                     col_letter = col_number_to_letter(column_index)
                     coordinates = f"{col_letter}{row_index}"
                     if appendToLabs == True:
-                        results_lab[coordinates] = cell_text
+                        if (int(cell_width)==2): #lab is not full
+                            results_lab[coordinates] = cell_text+"==half=="
+                        else:
+                            results_lab[coordinates] = cell_text
                     else:
                         results[coordinates] = cell_text
     return results,results_lab
@@ -302,9 +312,10 @@ for day,day_index in days_of_week.items():
 
     if (day == "Friday"):
         room_times = extract_room_times(rows,isFrday=True)
+        lab_times = extract_lab_times(rows,isFrday=True)
     else:
         room_times = extract_room_times(rows)
-    lab_times = extract_lab_times(rows)
+        lab_times = extract_lab_times(rows)
     room_locations = extract_room_locations(rows)
     lab_locations = extract_lab_locations(rows)
     for depart in departments:
