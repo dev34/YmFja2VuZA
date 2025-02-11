@@ -30,12 +30,20 @@ class ScheduleProcessor:
             match = re.search(r'\(AI-([A-Z0-9]+)', name)
         elif self.department == "BS DS":
             match = re.search(r'\(DS-([A-Z0-9]+)', name)
-        return match.group(1)[-1] if match else None
+        if match:
+            if (len(match.group(1))!=1) and (match.group(1)[0].isdigit() == True):
+                return match.group(1)[-1]
+            else:
+                return match.group(1)
+        else:
+            return None
 
     def extract_time(self, name):
         """Extract time from the name if explicitly provided."""
-        match = re.search(r'\b(\d{1,2}:\d{2}(?:[-:\s]\d{1,2}:\d{2}))\b', name)
-        return match.group(1) if match else None
+        pattern = r'\b(?:\d{1,2}:\d{2}[-:\s]\d{1,2}:\d{2}|\d{1,2}:\d{2}:\d{2}[-:\s]\d{1,2}:\d{2}|\d{1,2}:\d{2}:\d{2}:\d{2})\b'
+        match = re.search(pattern, name)
+        
+        return match.group(0) if match else None
 
     def split_key(self, key):
         """Split the key into its letter (time) and numeric (location) components."""
@@ -204,6 +212,9 @@ def programme_course_name_extractor(department,batch,sheet_style_tags, sheet_row
                     cell_text[0] = cell_text[0] + "[Cancelled]"
                     cell_text = " (".join(cell_text)
                 if "ReSch" in cell_text or "Resch" in cell_text or "resch" in cell_text:
+                    cell_text = cell_text.replace("ReSch","").strip()
+                    cell_text = cell_text.replace("Resch","").strip()
+                    cell_text = cell_text.replace("resch","").strip()
                     cell_text = cell_text.split("(")
                     cell_text[0] = cell_text[0] + "[Rescheduled]"
                     cell_text = " (".join(cell_text)
