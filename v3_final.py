@@ -34,7 +34,7 @@ class ScheduleProcessor:
             if (len(match.group(1))!=1) and (match.group(1)[0].isdigit() == True):
                 return match.group(1)[-1]
             else:
-                return match.group(1)
+                return match.group(1)[0]
         else:
             return None
 
