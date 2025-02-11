@@ -21,20 +21,20 @@ class ScheduleProcessor:
     def extract_section(self, name):
         """Extract the section (e.g., A, B) from the name."""
         if self.department == "BS CY":
-            match = re.search(r'\(CY-([A-Z]+)', name)
+            match = re.search(r'\(CY-([A-Z0-9]+)', name)
         elif self.department == "BS CS":
-            match = re.search(r'\(CS-([A-Z]+)', name)
+            match = re.search(r'\(CS-([A-Z0-9]+)', name)
         elif self.department == "BS SE":
-            match = re.search(r'\(SE-([A-Z]+)', name)
+            match = re.search(r'\(SE-([A-Z0-9]+)', name)
         elif self.department == "BS AI":
-            match = re.search(r'\(AI-([A-Z]+)', name)
+            match = re.search(r'\(AI-([A-Z0-9]+)', name)
         elif self.department == "BS DS":
-            match = re.search(r'\(DS-([A-Z]+)', name)
-        return match.group(1) if match else None
+            match = re.search(r'\(DS-([A-Z0-9]+)', name)
+        return match.group(1)[-1] if match else None
 
     def extract_time(self, name):
         """Extract time from the name if explicitly provided."""
-        match = re.search(r'\b(\d{1,2}:\d{0,2}[-:]\d{1,2}:\d{0,2})\b', name)
+        match = re.search(r'\b(\d{1,2}:\d{2}(?:[-:\s]\d{1,2}:\d{2}))\b', name)
         return match.group(1) if match else None
 
     def split_key(self, key):
