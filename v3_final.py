@@ -40,7 +40,7 @@ class ScheduleProcessor:
 
     def extract_time(self, name):
         """Extract time from the name if explicitly provided."""
-        pattern = r'\b(?:\d{1,2}:\d{2}[-:\s]\d{1,2}:\d{2}|\d{1,2}:\d{2}:\d{2}[-:\s]\d{1,2}:\d{2}|\d{1,2}:\d{2}:\d{2}:\d{2})\b'
+        pattern = r'(?:(?<=\s)|^)(\d{1,2}:\d{2}(?:\s?[-:\s]\s?\d{1,2}:\d{2})?|\d{1,2}:\d{2}:\d{2}(?:\s?[-:\s]\s?\d{1,2}:\d{2})?|\d{1,2}:\d{2}:\d{2}:\d{2})(?=\D|$)'
         match = re.search(pattern, name)
         
         return match.group(0) if match else None
@@ -61,7 +61,13 @@ class ScheduleProcessor:
 
             time_letter, location_number = self.split_key(key)
             time = self.extract_time(name) or self.room_times.get(time_letter, 'N/A')
-            location = self.room_locations.get(location_number, 'N/A')
+            loc_pattern = r"[A-Z]-?\d{3}" #to check if location is in the name
+            extracted_location = re.search(loc_pattern, name)
+            if (extracted_location):
+                location = extracted_location.group()
+            else:
+                location = self.room_locations.get(location_number, 'N/A')
+            
 
             self.final_schedule.setdefault(section, []).append({
                 'name': name.split('(')[0].strip(),
@@ -94,7 +100,6 @@ class ScheduleProcessor:
 
 
 def col_number_to_letter(col_number):
-    
     letters = ""
     while col_number > 0:
         col_number, remainder = divmod(col_number - 1, 26)
