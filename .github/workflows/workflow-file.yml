@@ -19,11 +19,15 @@ jobs:
         python-version: 3.9
 
     - name: Install Dependencies
-      run: |
-        pip install requests PyGithub beautifulsoup4 cssutils
+      run: pip install requests beautifulsoup4 cssutils firebase-admin
+
+    - name: Decode and Create Firebase Key File
+      env:
+        FIREBASE_KEY: ${{ secrets.FIREBASE_KEY }}
+      run: echo "$FIREBASE_KEY" | base64 --decode > firebase-key.json
 
     - name: Run comparer.py
-      env:
-        TOKEN: ${{ secrets.TOKEN }}
-      run: |
-        python comparer.py
+      run: python comparer.py
+
+    - name: Cleanup
+      run: rm firebase-key.json
