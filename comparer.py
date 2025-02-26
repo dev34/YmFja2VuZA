@@ -1,33 +1,45 @@
 import hashlib
-import requests
 import subprocess
+import requests
 import os
-import os
-from github import Github
+import json
+import firebase_admin
+from firebase_admin import credentials, firestore
 
-
+# Initialize Firebase Admin SDK
+cred = credentials.Certificate("firebase-key.json")  # Path to your Firebase private key JSON
+firebase_admin.initialize_app(cred)
+db = firestore.client()
 
 # Function to compute file hash
-def compute_file_hash(file_path, hash_algorithm="sha256"):
+def compute_file_hash(file_path, hash_algorithm="md5"):
     hash_func = hashlib.new(hash_algorithm)
     with open(file_path, "rb") as f:
-        while chunk := f.read(8192):
-            hash_func.update(chunk)
+        json_data = json.load(f)  # Load JSON to normalize
+        normalized_json = json.dumps(json_data, sort_keys=True, separators=(',', ':'))  # Remove spaces
+        hash_func.update(normalized_json.encode('utf-8'))  # Encode before hashing
     return hash_func.hexdigest()
 
-# Step 1: Download the file
-url = "https://fastschedule.github.io/db/timetable.json"
+# Step 1: Download the file from Firestore
 old_file = "timetable.old.json"
 new_file = "timetable.json"
 
 try:
-    response = requests.get(url)
-    response.raise_for_status()
-    with open(old_file, "wb") as f:
-        f.write(response.content)
+    #download .json file from "https://fastscheduledb.abdulmoiz-marz.workers.dev/" and add param to increment the view counter
+    BASE_URL = "https://fastscheduledb.abdulmoiz-marz.workers.dev?nocount=true"
+
+    headers = {
+        "Origin": "https://fastschedule.github.io" 
+    }
+    response = requests.get(BASE_URL, headers=headers)
+    #write json data to file
+    response = response.json()
+    response = response["data"]
+    with open(old_file, "w") as f:
+        json.dump(response, f, indent=4)
     print(f"Downloaded and saved as {old_file}")
 except Exception as e:
-    print(f"Error downloading the file: {e}")
+    print(f"Error fetching from Firestore: {e}")
     exit(1)
 
 # Step 2: Compute hash of the downloaded file
@@ -53,30 +65,14 @@ else:
 
 # Step 5: Compare the hashes
 if old_file_hash == new_file_hash:
-    print("The hashes are identical. The files are the same.")
+    print("The hashes are identical. The files are the same. No need to upload.")
 else:
-    print("The hashes are different. The files have changed.")
-    print("Uploading the new file to Github...")
+    print("The hashes are different. Updating Firestore...")
 
-    GITHUB_TOKEN = os.getenv("TOKEN")
-    REPO_NAME = "fastschedule/fastschedule.github.io"
-    FILE_PATH = "db/timetable.json"
-    LOCAL_FILE_PATH = "timetable.json"
-    COMMIT_MESSAGE = "update timetable.json"
-
-    g = Github(GITHUB_TOKEN)
-    repo = g.get_repo(REPO_NAME)
     try:
-        contents = repo.get_contents(FILE_PATH)
-        with open(LOCAL_FILE_PATH, "r") as file:
-            content = file.read()
-        repo.update_file(contents.path, COMMIT_MESSAGE, content, contents.sha)
-        print(f"File '{FILE_PATH}' updated successfully!")
+        with open(new_file, "r") as file:
+            json_data = json.load(file)
+        db.collection("data").document("timetable").set({"json": json.dumps(json_data)})
+        print("✅ Timetable successfully uploaded to Firestore!")
     except Exception as e:
-        if "404" in str(e):
-            with open(LOCAL_FILE_PATH, "r") as file:
-                content = file.read()
-            repo.create_file(FILE_PATH, COMMIT_MESSAGE, content)
-            print(f"File '{FILE_PATH}' created successfully!")
-        else:
-            print(f"An error occurred: {e}")
+        print(f"An error occurred while updating Firestore: {e}")
