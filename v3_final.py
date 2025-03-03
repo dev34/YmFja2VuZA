@@ -301,7 +301,7 @@ most_final = {}
 # List of departments and batches
 batches = ["2021","2022","2023","2024"]
 departments = ["BS CY","BS CS","BS SE","BS AI","BS DS"]
-days_of_week = {"Monday":1, "Tuesday":2, "Wednesday":3, "Thursday":4, "Friday":5}
+days_of_week = {"Monday":0, "Tuesday":1, "Wednesday":2, "Thursday":3, "Friday":4}
 
 # Initialize the dictionary structure
 for day in days_of_week.keys():
